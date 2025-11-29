@@ -1,0 +1,32 @@
+{
+  "name": "brosolve-backend",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+  "start": "node src/server.js",
+  "dev": "nodemon src/server.js",
+  "create-admin2": "node scripts/createAdmin2.js",
+  "create-superadmin": "node scripts/createSuperAdmin.js",
+  "seed-categories": "node scripts/seedCategories.js",
+  "diagnose-auth-users": "node scripts/diagnoseAuthUsers.js",
+  "fix-auth-users": "node scripts/fixAuthUsers.js"
+},
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.3",
+    "multer": "^2.0.2",
+    "nodemailer": "^6.9.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  }
+}
