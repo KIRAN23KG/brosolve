@@ -102,10 +102,49 @@ router.post(
       if (!complaint)
         return res.status(404).json({ message: "Complaint not found" });
 
-      const sender = req.user.role;
+      // Authorization check
+      const isStudent = req.user.role === 'student';
+      const isAdmin = ['admin', 'superadmin'].includes(req.user.role);
+
+      if (isStudent && complaint.raisedBy.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'You can only message your own complaints' });
+      }
+
+      if (!isStudent && !isAdmin) {
+        return res.status(403).json({ message: 'Unauthorized' });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ message: 'Audio file required' });
+      }
+
+      // Determine sender type CORRECTLY
+      let sender = "";
+      if (req.user.role === "student") {
+        sender = "student";
+      } else if (req.user.role === "admin" || req.user.role === "superadmin") {
+        sender = "admin";
+      } else {
+        return res.status(403).json({ message: "Invalid sender role" });
+      }
 
       const audioUrl = `/uploads/audio/${req.file.filename}`;
 
+      // Add message to complaint.messages array (for chat display)
+      const newMessage = {
+        sender,
+        message: '',
+        type: 'audio',
+        audioUrl,
+        seenByAdmin: sender === 'admin',
+        seenByStudent: sender === 'student',
+        createdAt: new Date()
+      };
+
+      complaint.messages.push(newMessage);
+      await complaint.save();
+
+      // Also create Reply document for backward compatibility
       const reply = await Reply.create({
         complaintId: complaint._id,
         text: "",
@@ -119,9 +158,13 @@ router.post(
         ],
       });
 
-      return res.json({
+      // Get the newly added message (last one in array)
+      const savedMessage = complaint.messages[complaint.messages.length - 1];
+
+      return res.status(201).json({
         success: true,
-        reply,
+        fileUrl: audioUrl,
+        newMessage: savedMessage
       });
     } catch (err) {
       return res

@@ -83,9 +83,15 @@ app.use('/api/quick-replies', quickRepliesRoutes);
 app.get('/api/users', auth, permit('admin', 'superadmin'), async (req, res) => {
   try {
     const User = require('./models/User');
-    const users = await User.find({}, { passwordHash: 0 }).sort({ createdAt: -1 });
-    res.json({ users });
+    const users = await User.find({})
+      .select('_id name email role')
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    // Return empty array if no users found, not an error
+    res.json({ users: users || [] });
   } catch (err) {
+    console.error('Error fetching users:', err);
     res.status(500).json({ message: 'Error fetching users', error: err.message });
   }
 });

@@ -7,6 +7,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import '../../styles/chat.css';
 
 export default function AdminComplaintChat() {
+  const isStudentView = window.location.pathname.includes("/student");
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
@@ -220,14 +221,22 @@ export default function AdminComplaintChat() {
         const formData = new FormData();
         formData.append("audio", blob, "voice-message.webm");
 
-        const response = await api.post(
-          `/replies/complaint/${id}/audio`,
-          formData,
-          { headers: { "Content-Type": "multipart/form-data" } }
-        );
+        try {
+          const response = await api.post(
+            `/replies/complaint/${id}/audio`,
+            formData,
+            { headers: { "Content-Type": "multipart/form-data" } }
+          );
 
-        if (response.data.reply) {
-          fetchMessages();
+          if (response.data.success && response.data.newMessage) {
+            // Immediately add the new message to chat
+            setMessages(prev => [...prev, response.data.newMessage]);
+            // Also refresh to ensure sync
+            fetchMessages();
+          }
+        } catch (err) {
+          console.error('Error sending voice message:', err);
+          alert('Failed to send voice message');
         }
 
         audioChunksRef.current = [];
@@ -391,15 +400,19 @@ export default function AdminComplaintChat() {
               {(() => {
                 let lastSenderType = null;
                 return messages.map((msg, index) => {
-                  const senderType = msg.sender === "admin" ? "you" : "student";
+                  const sender = msg.sender?.toLowerCase();
+
+                  // student view → YOU = student
+                  const isSelf = isStudentView ? sender === "student" : sender === "admin";
+
+                  const sideClass = isSelf ? "right" : "left";
+                  const colorClass = isSelf ? "pink" : "green";
+
+                  const senderType = isSelf ? "you" : (isStudentView ? "admin" : "student");
                   const showHeader = lastSenderType !== senderType;
                   lastSenderType = senderType;
                   const showDate = index === 0 || 
                   formatDate(messages[index - 1].createdAt) !== formatDate(msg.createdAt);
-
-                  // ADMIN VIEW: admin → RIGHT + PINK, student → LEFT + GREEN
-                  const alignment = msg.sender === "admin" ? "right" : "left";
-                  const bubbleColor = msg.sender === "admin" ? "pink" : "green";
 
                 return (
                   <div key={msg._id || index}>
@@ -414,10 +427,10 @@ export default function AdminComplaintChat() {
                       </div>
                     )}
                     <div 
-                      className={`msg-row ${alignment}`}
+                      className={`msg-row ${sideClass}`}
                       ref={el => messageRefs.current[msg._id] = el}
                     >
-                      <div className={`bubble ${bubbleColor}`} onClick={(e) => handleReactionClick(msg._id, e)}>
+                      <div className={`bubble ${colorClass}`} onClick={(e) => handleReactionClick(msg._id, e)}>
                         {msg.audioUrl && (
                           <audio
                             controls
