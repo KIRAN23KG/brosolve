@@ -333,74 +333,28 @@ router.post('/:id/messages', auth, upload.any(), async (req, res) => {
 router.get('/:id/messages', auth, async (req, res) => {
   try {
     const complaint = await Complaint.findById(req.params.id)
-      .populate('raisedBy', '_id')
-      .populate('assignedTo', '_id');
+      .populate('raisedBy', 'name email')
+      .populate('assignedTo', 'name email');
 
     if (!complaint) return res.status(404).json({ message: "Complaint not found" });
 
     const isStudent = req.user.role === "student";
     const isAdmin = ["admin", "superadmin"].includes(req.user.role);
 
+    // Normalize IDs before comparison
+    const complaintOwner = complaint.raisedBy?._id?.toString() || complaint.raisedBy?.toString();
+    const assignedAdmin = complaint.assignedTo?._id?.toString() || complaint.assignedTo?.toString();
+    const currentUser = req.user.id?.toString();
+
     // Authorization
-    if (isStudent && complaint.raisedBy.toString() !== req.user.id) {
+    if (isStudent && complaintOwner !== currentUser) {
       return res.status(403).json({ message: "You can only view messages for your own complaints" });
     }
     if (!isStudent && !isAdmin) {
       return res.status(403).json({ message: "Unauthorized" });
     }
 
-    // 1) Fetch new Reply-based messages (voice + text)
-    const replies = await Reply.find({ complaintId: req.params.id })
-      .populate('by', '_id role')
-      .sort({ createdAt: 1 });
-
-    const normalizedReplies = replies.map(r => ({
-      _id: r._id,
-      senderId: r.by?._id?.toString() || "",
-      senderRole: r.by?.role === "student" ? "student" : "admin",
-      message: r.text || "",
-      attachments: r.attachments || [],
-      createdAt: r.createdAt
-    }));
-
-    // 2) Normalize old complaint.messages
-    const normalizedOld = complaint.messages.map(m => {
-
-      // Convert string attachments → object
-      const attachments = (m.attachments || []).map(att => {
-        if (typeof att === "string") {
-          return {
-            url: att,
-            filename: att.split("/").pop(),
-            mimetype: att.includes("/audio/") ? "audio/webm" : "application/octet-stream"
-          };
-        }
-        return att;
-      });
-
-      const senderRole = m.sender === "admin" ? "admin" : "student";
-      const senderId =
-        senderRole === "admin"
-          ? (complaint.assignedTo?._id?.toString() || "")
-          : (complaint.raisedBy?._id?.toString() || "");
-
-      return {
-        _id: m._id,
-        senderId: senderId,
-        senderRole: senderRole,
-        message: m.message || "",
-        attachments,
-        createdAt: m.createdAt
-      };
-    });
-
-    // 3) Merge both arrays
-    const merged = [...normalizedOld, ...normalizedReplies];
-
-    // 4) Sort by timestamp
-    merged.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
-
-    // 5) Mark seen
+    // Mark seen
     const seenField = isStudent ? "seenByStudent" : "seenByAdmin";
     complaint.messages.forEach(m => {
       if (m.sender !== (isStudent ? "student" : "admin")) {
@@ -409,20 +363,15 @@ router.get('/:id/messages', auth, async (req, res) => {
     });
     await complaint.save();
 
-    // 6) Count unread (from opposite person)
-    const unreadCount = merged.filter(m => {
-      return isStudent ? m.senderRole === "admin" : m.senderRole === "student";
+    // Count unread (from opposite person)
+    const unreadCount = complaint.messages.filter(m => {
+      return isStudent ? m.sender === "admin" : m.sender === "student";
     }).length;
 
     return res.json({
-      messages: merged,
+      messages: complaint.messages,
       unreadCount,
-      complaint: {
-        _id: complaint._id,
-        title: complaint.title,
-        status: complaint.status,
-        raisedBy: complaint.raisedBy
-      }
+      complaint
     });
 
   } catch (err) {

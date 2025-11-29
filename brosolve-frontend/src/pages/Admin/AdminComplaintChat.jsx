@@ -389,24 +389,10 @@ export default function AdminComplaintChat() {
           ) : (
             <div className="space-y-4">
               {(() => {
-                const currentUserId =
-                  user?.id?.toString() ||
-                  user?._id?.toString() ||
-                  user?.userId?.toString() ||
-                  user?.data?._id?.toString() ||
-                  user?.data?.id?.toString();
                 let lastSenderType = null;
                 return messages.map((msg, index) => {
-                  console.log("MESSAGE:", msg);
-                  const currentUserId =
-                    user?.id ||
-                    user?._id ||
-                    user?.userId ||
-                    user?.id?.toString() ||
-                    null;
-                  console.log("CURRENT USER:", currentUserId);
                   // ADMIN VIEW: isSelf === true → RIGHT → PINK, else → LEFT → GREEN
-                  const isSelf = msg.senderId?.toString() === currentUserId?.toString();
+                  const isSelf = msg.sender === "admin";
                   const senderType = isSelf ? "you" : "student";
                   const showHeader = lastSenderType !== senderType;
                   lastSenderType = senderType;
@@ -430,31 +416,32 @@ export default function AdminComplaintChat() {
                       ref={el => messageRefs.current[msg._id] = el}
                     >
                       <div className={`bubble ${isSelf ? 'pink' : 'green'}`} onClick={(e) => handleReactionClick(msg._id, e)}>
-                        {msg.attachments?.length > 0 &&
-                         msg.attachments[0].mimetype?.startsWith("audio") ? (
+                        {msg.audioUrl && (
                           <audio
                             controls
-                            src={`http://localhost:4000${msg.attachments[0].url}`}
+                            src={`http://localhost:4000${msg.audioUrl}`}
                             className="w-full"
                           />
-                        ) : null}
+                        )}
                         {msg.message && (
                           <p className="text-sm mb-1">{msg.message}</p>
                         )}
-                        {msg.attachments && msg.attachments.length > 0 && 
-                         !msg.attachments[0].mimetype?.startsWith("audio") && (
+                        {msg.attachments && msg.attachments.length > 0 && (
                           <div className="mt-2 space-y-1">
-                            {msg.attachments.map((file, idx) => (
-                              <a
-                                key={idx}
-                                href={`http://localhost:4000${file.url}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className={`text-xs underline block ${isSelf ? 'text-black' : 'text-white'}`}
-                              >
-                                Attachment {idx + 1}
-                              </a>
-                            ))}
+                            {msg.attachments.map((file, idx) => {
+                              const fileUrl = typeof file === 'string' ? file : file.url;
+                              return (
+                                <a
+                                  key={idx}
+                                  href={`http://localhost:4000${fileUrl}`}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className={`text-xs underline block ${isSelf ? 'text-black' : 'text-white'}`}
+                                >
+                                  Attachment {idx + 1}
+                                </a>
+                              );
+                            })}
                           </div>
                         )}
                         <span className="timestamp">
