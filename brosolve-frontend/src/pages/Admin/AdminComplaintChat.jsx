@@ -391,13 +391,15 @@ export default function AdminComplaintChat() {
               {(() => {
                 let lastSenderType = null;
                 return messages.map((msg, index) => {
-                  // ADMIN VIEW: isSelf === true → RIGHT → PINK, else → LEFT → GREEN
-                  const isSelf = msg.sender === "admin";
-                  const senderType = isSelf ? "you" : "student";
+                  const senderType = msg.sender === "admin" ? "you" : "student";
                   const showHeader = lastSenderType !== senderType;
                   lastSenderType = senderType;
                   const showDate = index === 0 || 
                   formatDate(messages[index - 1].createdAt) !== formatDate(msg.createdAt);
+
+                  // ADMIN VIEW: admin → RIGHT + PINK, student → LEFT + GREEN
+                  const alignment = msg.sender === "admin" ? "right" : "left";
+                  const bubbleColor = msg.sender === "admin" ? "pink" : "green";
 
                 return (
                   <div key={msg._id || index}>
@@ -412,10 +414,10 @@ export default function AdminComplaintChat() {
                       </div>
                     )}
                     <div 
-                      className={`msg-row ${isSelf ? 'right' : 'left'}`}
+                      className={`msg-row ${alignment}`}
                       ref={el => messageRefs.current[msg._id] = el}
                     >
-                      <div className={`bubble ${isSelf ? 'pink' : 'green'}`} onClick={(e) => handleReactionClick(msg._id, e)}>
+                      <div className={`bubble ${bubbleColor}`} onClick={(e) => handleReactionClick(msg._id, e)}>
                         {msg.audioUrl && (
                           <audio
                             controls

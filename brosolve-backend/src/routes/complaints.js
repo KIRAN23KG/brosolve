@@ -260,8 +260,15 @@ router.post('/:id/messages', auth, upload.any(), async (req, res) => {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
-    // Determine sender type
-    const sender = isStudent ? 'student' : 'admin';
+    // Determine sender type CORRECTLY
+    let sender = "";
+    if (req.user.role === "student") {
+        sender = "student";
+    } else if (req.user.role === "admin" || req.user.role === "superadmin") {
+        sender = "admin";
+    } else {
+        return res.status(403).json({ message: "Invalid sender role" });
+    }
 
     // Handle file attachments
     const files = req.files || [];
@@ -269,11 +276,12 @@ router.post('/:id/messages', auth, upload.any(), async (req, res) => {
 
     // Create message
     const newMessage = {
-      sender,
-      message: req.body.message || req.body.text || '',
-      attachments: attachmentUrls,
-      seenByAdmin: sender === 'admin',
-      seenByStudent: sender === 'student'
+        sender,
+        message: req.body.message || "",
+        attachments: attachmentUrls,
+        createdAt: new Date(),
+        seenByAdmin: sender === "admin",
+        seenByStudent: sender === "student"
     };
 
     complaint.messages.push(newMessage);

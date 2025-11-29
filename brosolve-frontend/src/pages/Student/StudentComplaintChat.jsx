@@ -442,15 +442,15 @@ export default function StudentComplaintChat() {
               {(() => {
                 let lastSenderType = null;
                 return messages.map((msg, index) => {
-                  // Apply same rule as Admin: admin → LEFT + GREEN, student → RIGHT + PINK
-                  // Match Admin pattern: admin messages are LEFT + GREEN, student messages are RIGHT + PINK
-                  const isAdmin = msg.sender === "admin";
-                  const isSelf = msg.sender === "student";
-                  const senderType = isSelf ? "you" : "admin";
+                  const senderType = msg.sender === "student" ? "you" : "admin";
                   const showHeader = lastSenderType !== senderType;
                   lastSenderType = senderType;
                   const showDate = index === 0 || 
                   formatDate(messages[index - 1].createdAt) !== formatDate(msg.createdAt);
+
+                  // STUDENT VIEW: student → RIGHT + PINK, admin → LEFT + GREEN
+                  const alignment = msg.sender === "student" ? "right" : "left";
+                  const bubbleColor = msg.sender === "student" ? "pink" : "green";
 
                 return (
                   <div key={msg._id || index}>
@@ -465,10 +465,10 @@ export default function StudentComplaintChat() {
                       </div>
                     )}
                     <div 
-                      className={`msg-row ${isAdmin ? 'left' : 'right'}`}
+                      className={`msg-row ${alignment}`}
                       ref={el => messageRefs.current[msg._id] = el}
                     >
-                      <div className={`bubble ${isAdmin ? 'green' : 'pink'}`} onClick={(e) => handleReactionClick(msg._id, e)}>
+                      <div className={`bubble ${bubbleColor}`} onClick={(e) => handleReactionClick(msg._id, e)}>
                         {msg.audioUrl && (
                           <audio
                             controls
