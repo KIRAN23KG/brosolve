@@ -106,7 +106,11 @@ router.post(
       const isStudent = req.user.role === 'student';
       const isAdmin = ['admin', 'superadmin'].includes(req.user.role);
 
-      if (isStudent && complaint.raisedBy.toString() !== req.user.id) {
+      // Normalize IDs before comparison
+      const complaintOwner = complaint.raisedBy?._id?.toString() || complaint.raisedBy?.toString();
+      const currentUser = req.user.id?.toString();
+
+      if (isStudent && complaintOwner !== currentUser) {
         return res.status(403).json({ message: 'You can only message your own complaints' });
       }
 
@@ -130,24 +134,9 @@ router.post(
 
       const audioUrl = `/uploads/audio/${req.file.filename}`;
 
-      // Add message to complaint.messages array (for chat display)
-      const newMessage = {
-        sender,
-        message: '',
-        type: 'audio',
-        audioUrl,
-        seenByAdmin: sender === 'admin',
-        seenByStudent: sender === 'student',
-        createdAt: new Date()
-      };
-
-      complaint.messages.push(newMessage);
-      await complaint.save();
-
-      // Also create Reply document for backward compatibility
+      // Create Reply document (does NOT require message field)
       const reply = await Reply.create({
         complaintId: complaint._id,
-        text: "",
         by: req.user.id,
         attachments: [
           {
@@ -158,13 +147,9 @@ router.post(
         ],
       });
 
-      // Get the newly added message (last one in array)
-      const savedMessage = complaint.messages[complaint.messages.length - 1];
-
       return res.status(201).json({
         success: true,
-        fileUrl: audioUrl,
-        newMessage: savedMessage
+        reply
       });
     } catch (err) {
       return res

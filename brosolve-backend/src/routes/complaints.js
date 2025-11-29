@@ -10,6 +10,7 @@ const { upload, audioUpload } = require('../utils/upload');
 const { auth } = require('../middleware/auth');
 const { permit } = require('../middleware/role');
 const { notifyComplaintCreated, notifyComplaintSolved } = require('../services/notifications');
+const { getTyping, updateTyping } = require('../services/typing');
 
 const router = express.Router();
 
@@ -644,88 +645,9 @@ router.get('/:id/typing', auth, async (req, res) => {
   }
 });
 
-// 1️⃣3️⃣ POST /api/complaints/:id/messages/audio - Send voice message
-router.post('/:id/messages/audio', auth, (req, res, next) => {
-  audioUpload.single('audio')(req, res, (err) => {
-    if (err) {
-      return res.status(400).json({ message: err.message || 'Invalid audio file' });
-    }
-    next();
-  });
-}, async (req, res) => {
-  try {
-    const complaint = await Complaint.findById(req.params.id);
-    if (!complaint) return res.status(404).json({ message: 'Complaint not found' });
-
-    // Authorization check
-    const isStudent = req.user.role === 'student';
-    const isAdmin = ['admin', 'superadmin'].includes(req.user.role);
-
-    if (isStudent && complaint.raisedBy.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'You can only message your own complaints' });
-    }
-
-    if (!isStudent && !isAdmin) {
-      return res.status(403).json({ message: 'Unauthorized' });
-    }
-
-    if (!req.file) {
-      return res.status(400).json({ message: 'Audio file required' });
-    }
-
-    const sender = isStudent ? 'student' : 'admin';
-    const audioUrl = `/uploads/audio/${req.file.filename}`;
-
-    const newMessage = {
-      sender,
-      message: '',
-      type: 'audio',
-      audioUrl,
-      seenByAdmin: sender === 'admin',
-      seenByStudent: sender === 'student'
-    };
-
-    complaint.messages.push(newMessage);
-    await complaint.save();
-
-    // Create notification (same as text messages)
-    try {
-      if (isStudent) {
-        const admins = await User.find({ role: { $in: ['admin', 'superadmin'] } });
-        for (const admin of admins) {
-          await Notification.create({
-            user: admin._id,
-            type: 'new_message',
-            complaint: complaint._id,
-            message: complaint.messages[complaint.messages.length - 1]._id.toString(),
-            title: 'New voice message',
-            body: `${complaint.raisedBy?.name || 'Student'} sent a voice message in "${complaint.title}"`
-          });
-        }
-      } else {
-        await Notification.create({
-          user: complaint.raisedBy,
-          type: 'new_message',
-          complaint: complaint._id,
-          message: complaint.messages[complaint.messages.length - 1]._id.toString(),
-          title: 'New voice message',
-          body: `Admin sent a voice message in "${complaint.title}"`
-        });
-      }
-    } catch (notifErr) {
-      console.error('Notification creation error:', notifErr.message);
-    }
-
-    res.json({ 
-      success: true,
-      message: 'Voice message sent successfully',
-      fileUrl: audioUrl,
-      complaint,
-      newMessage: complaint.messages[complaint.messages.length - 1]
-    });
-  } catch (err) {
-    res.status(500).json({ message: 'Error sending voice message', error: err.message });
-  }
+// 1️⃣3️⃣ POST /api/complaints/:id/messages/audio - DISABLED (use /api/replies/complaint/:id/audio instead)
+router.post('/:id/messages/audio', auth, (req, res) => {
+  return res.status(404).json({ message: 'This endpoint is disabled. Use /api/replies/complaint/:id/audio instead' });
 });
 
 module.exports = router;

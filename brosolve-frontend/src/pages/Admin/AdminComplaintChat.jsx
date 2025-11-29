@@ -51,10 +51,28 @@ export default function AdminComplaintChat() {
 
   const fetchMessages = async () => {
     try {
-      const res = await api.get(`/complaints/${id}/messages`);
-      setMessages(res.data.messages || []);
-      setComplaint(res.data.complaint);
-      setUnreadCount(res.data.unreadCount || 0);
+      const complaintRes = await api.get(`/complaints/${id}/messages`);
+      const repliesRes = await api.get(`/replies/complaint/${id}`);
+
+      // Combine messages
+      const combined = [
+        ...(complaintRes.data.messages || []).map(m => ({ ...m, type: "complaint" })),
+        ...(repliesRes.data.replies || []).map(r => ({
+          _id: r._id,
+          sender: r.by?.role === "student" ? "student" : "admin",
+          message: r.text || "[voice message]",
+          audioUrl: r.attachments?.length ? r.attachments[0].url : null,
+          createdAt: r.createdAt,
+          type: "reply"
+        }))
+      ];
+
+      // Sort by date
+      combined.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+
+      setMessages(combined);
+      setComplaint(complaintRes.data.complaint);
+      setUnreadCount(complaintRes.data.unreadCount || 0);
     } catch (err) {
       console.error('Error fetching messages:', err);
       if (err.response?.status === 404) {
@@ -218,20 +236,21 @@ export default function AdminComplaintChat() {
 
       mediaRecorderRef.current.onstop = async () => {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-        const formData = new FormData();
-        formData.append("audio", blob, "voice-message.webm");
+        const fd = new FormData();
+        fd.append("audio", blob, "voice.webm");
 
         try {
           const response = await api.post(
             `/replies/complaint/${id}/audio`,
-            formData,
-            { headers: { "Content-Type": "multipart/form-data" } }
+            fd,
+            { 
+              headers: { "Content-Type": "multipart/form-data" },
+              withCredentials: true
+            }
           );
 
-          if (response.data.success && response.data.newMessage) {
-            // Immediately add the new message to chat
-            setMessages(prev => [...prev, response.data.newMessage]);
-            // Also refresh to ensure sync
+          if (response.data.success) {
+            // Refresh messages to include the new reply
             fetchMessages();
           }
         } catch (err) {
